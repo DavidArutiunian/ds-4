@@ -1,16 +1,22 @@
 using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
+using System.Threading;
 using Grpc.Core;
 using Microsoft.Extensions.Logging;
 using NATS.Client;
 using System.Text;
 using StackExchange.Redis;
+using BackendApi.Models;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace BackendApi.Services
 {
     public class JobService : Job.JobBase, IDisposable
     {
+        private static int MAX_RETRIES = 10;
+        private static int SLEEP_TIMEOUT = 1000;
         private readonly static Dictionary<string, string> _jobs = new Dictionary<string, string>();
         private readonly ILogger<JobService> _logger;
         private readonly IConnection _nats;
@@ -28,8 +34,37 @@ namespace BackendApi.Services
             string id = Guid.NewGuid().ToString();
             var resp = new RegisterResponse { Id = id };
             _jobs[id] = request.Description;
+            PublishRedisMessage(id, request.Description, request.Data);
             PublishNatsMessage(id);
-            PublishRedisMessage(id, request.Description);
+            return Task.FromResult(resp);
+        }
+
+        public override Task<GetProcessingResultResponse> GetProcessingResult(GetProcessingResultRequest request, ServerCallContext context)
+        {
+            string id = request.Id;
+            double rank = -1;
+            IDatabase db = _redis.GetDatabase();
+            int index = 0;
+            while (index++ < MAX_RETRIES)
+            {
+                string JSON = db.StringGet(id);
+                var model = JsonSerializer.Deserialize<RedisPayloadModel>(JSON);
+                if (model.Rank != -1)
+                {
+                    rank = model.Rank;
+                    break;
+                }
+                Thread.Sleep(SLEEP_TIMEOUT);
+            }
+            var resp = new GetProcessingResultResponse { Rank = rank };
+            if (rank == -1)
+            {
+                resp.Status = "in_progress";
+            }
+            else
+            {
+                resp.Status = "done";
+            }
             return Task.FromResult(resp);
         }
 
@@ -40,10 +75,12 @@ namespace BackendApi.Services
             _nats.Publish("events", payload);
         }
 
-        private void PublishRedisMessage(string id, string description)
+        private void PublishRedisMessage(string id, string description, string data)
         {
-          IDatabase db = _redis.GetDatabase();
-          db.StringSet(id, description);
+            var model = new RedisPayloadModel { Description = description, Data = data };
+            string result = JsonSerializer.Serialize(model);
+            IDatabase db = _redis.GetDatabase();
+            db.StringSet(id, result);
         }
 
         public void Dispose()

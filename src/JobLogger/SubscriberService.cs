@@ -5,6 +5,9 @@ using NATS.Client.Rx;
 using NATS.Client.Rx.Ops;
 using System.Linq;
 using StackExchange.Redis;
+using JobLogger.Models;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Subscriber
 {
@@ -20,9 +23,11 @@ namespace Subscriber
             {
                 IDatabase db = redis.GetDatabase();
                 string id = msg.Split('|').Last();
-                string description = db.StringGet(id);
+                string JSON = db.StringGet(id);
+                var model = JsonSerializer.Deserialize<RedisPayloadModel>(JSON);
                 Console.WriteLine(id);
-                Console.WriteLine(description);
+                Console.WriteLine(model.Description);
+                Console.WriteLine(model.Data);
             });
         }
     }

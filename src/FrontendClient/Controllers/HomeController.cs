@@ -25,11 +25,12 @@ namespace FrontendClient.Controllers
         }
 
         [HttpPost]
-        public async Task<IActionResult> HandleFormSubmit(String description) {
+        public async Task<RedirectToActionResult> HandleFormSubmit(string description, string text)
+        {
             using var channel = GrpcChannel.ForAddress("http://" + Environment.GetEnvironmentVariable("BACKEND_API_HOST") + ":5000");
             var client = new Job.JobClient(channel);
-            var reply = await client.RegisterAsync(new RegisterRequest { Description = description });
-            return View("Task", new TaskViewModel { Id = reply.Id });
+            var reply = await client.RegisterAsync(new RegisterRequest { Description = description, Data = text });
+            return RedirectToAction("Index", "TaskDetails", new { JobId = reply.Id });
         }
 
         [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]
