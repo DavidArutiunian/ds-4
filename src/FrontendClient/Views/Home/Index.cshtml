@@ -1,0 +1,14 @@
+﻿@{
+    ViewData["Title"] = "Form Page";
+}
+
+<div class="form__container">
+    <form asp-controller="Home" asp-action="HandleFormSubmit" class="form" method="post">
+        <div class="form__description">
+            <input type="text" placeholder="Описание" id="description" name="description">
+        </div>
+        <div class="form__submit">
+            <button id="submit" type="submit">Получить ID задачи</button>
+        </div>
+    </form>
+</div>
