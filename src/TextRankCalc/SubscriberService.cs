@@ -8,15 +8,12 @@ using System.Linq;
 using StackExchange.Redis;
 using TextRankCalc.Models;
 using System.Text.Json;
-using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 
 namespace Subscriber
 {
     public class SubscriberService
     {
-        private HashSet<char> vowels = new HashSet<char> { 'a', 'e', 'i', 'o', 'u' };
-        private HashSet<char> consonants = new HashSet<char> { 'q', 'w', 'r', 't', 'y', 'p', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', 'z', 'x', 'c', 'v', 'b', 'n', 'm' };
-
         public void Run(IConnection nats, ConnectionMultiplexer redis)
         {
             var events = nats.Observe("events")
@@ -47,12 +44,12 @@ namespace Subscriber
                 db.StringSet(id, payload);
             });
         }
+
         public double GetTextRank(string text)
         {
-            string loweredText = text.ToLower();
-            double totalVowels = loweredText.Count(c => vowels.Contains(c));
-            double totalConsonants = loweredText.Count(c => consonants.Contains(c));
-            return totalVowels / Math.Max(totalConsonants, 1);
+            double vowels = Regex.Matches(text, @"[AEIOUaeiou]").Count;
+            double consonants = Regex.Matches(text, @"[QWRTYPSDFGHJKLZXCVBNMqwrtypsdfghjklzxcvbnm]").Count;
+            return vowels / Math.Max(consonants, 1);
         }
     }
 }
